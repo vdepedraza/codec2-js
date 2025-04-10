@@ -1,0 +1,3 @@
+[submodule "codec2"]
+	path = codec2
+	url = git@github.com:vdepedraza/codec2.git
