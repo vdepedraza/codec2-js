@@ -1,0 +1,90 @@
+diff --git a/.gitignore b/.gitignore
+index edcb225..2fe0511 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,6 @@
+ build_linux
++build_native
++build_web
+ stm32/build_stm32
+ stm32/libstm32f4.a
+ stm32/unittest/lib/python/__pycache__/
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d96667f..8adb5ee 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -115,6 +115,9 @@ endif(MINGW)
+ #
+ # Default options
+ #
++option(COMPILE_GENERATE_CODEBOOK "Wether to compile the generate_codebook binary, disable when compiling with emscripten" ON)
++
++
+ option(BUILD_SHARED_LIBS
+     "Build shared library. Set to OFF for static library." ON)
+ option(UNITTEST "Build unittest binaries." OFF)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index fb10d28..191f207 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -62,30 +62,37 @@ set(CODEBOOKSNEWAMP2_ENERGY
+ )
+ 
+ # when crosscompiling we need a native executable
+-if(CMAKE_CROSSCOMPILING)
+-    set(CMAKE_DISABLE_SOURCE_CHANGES OFF)
+-    include(ExternalProject)
+-    ExternalProject_Add(codec2_native
+-       SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
+-       BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
+-       BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
+-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+-       BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
+-    )
+-    add_executable(generate_codebook IMPORTED)
++if(COMPILE_GENERATE_CODEBOOK)
++    if(CMAKE_CROSSCOMPILING)
++        set(CMAKE_DISABLE_SOURCE_CHANGES OFF)
++        include(ExternalProject)
++        ExternalProject_Add(codec2_native
++        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
++        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
++        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
++        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
++        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
++        )
++        add_executable(generate_codebook IMPORTED)
++        set_target_properties(generate_codebook PROPERTIES
++            IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
++        add_dependencies(generate_codebook codec2_native)
++        set(CMAKE_DISABLE_SOURCE_CHANGES ON)
++    else(CMAKE_CROSSCOMPILING)
++    # Build code generator binaries. These do not get installed.
++        # generate_codebook
++        add_executable(generate_codebook generate_codebook.c)
++        target_link_libraries(generate_codebook m)
++        # Make native builds available for cross-compiling.
++        export(TARGETS generate_codebook
++            FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
++    endif(CMAKE_CROSSCOMPILING)
++else (COMPILE_GENERATE_CODEBOOK)
++    add_executable(generate_codebook IMPORTED GLOBAL)
+     set_target_properties(generate_codebook PROPERTIES
+-        IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
+-    add_dependencies(generate_codebook codec2_native)
+-    set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+-else(CMAKE_CROSSCOMPILING)
+-# Build code generator binaries. These do not get installed.
+-    # generate_codebook
+-    add_executable(generate_codebook generate_codebook.c)
+-    target_link_libraries(generate_codebook m)
+-    # Make native builds available for cross-compiling.
+-    export(TARGETS generate_codebook
+-        FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
+-endif(CMAKE_CROSSCOMPILING)
++        IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/src/generate_codebook"  # path to your binary
++    )
++endif (COMPILE_GENERATE_CODEBOOK)
+ 
+ 
+ # codebook.c
